@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Theme root: app applies CSS variables via inline style */
+.theme-root {
+  --title-bar-bg: #323233;
+  --title-bar-border: #333333;
+  --title-bar-text: #9ca3af;
+  --command-palette-bg: #252526;
+  --activity-bar-bg: #333333;
+  --activity-bar-border: #333333;
+  --activity-bar-active-bg: #252526;
+  --activity-bar-text: #9ca3af;
+  --sidebar-bg: #252526;
+  --sidebar-border: #333333;
+  --sidebar-selected-bg: #094771;
+  --sidebar-hover-bg: #2a2d2e;
+  --sidebar-header-text: #6b7280;
+  --tab-bar-bg: #252526;
+  --tab-bar-border: #333333;
+  --tab-active-border: #007acc;
+  --tab-active-bg: #1e1e1e;
+  --tab-text: #9ca3af;
+  --tab-text-active: #ffffff;
+  --editor-bg: #1e1e1e;
+  --breadcrumb-bg: #252526;
+  --breadcrumb-text: #6b7280;
+  --breadcrumb-text-active: #d1d5db;
+  --status-bar-bg: #007acc;
+  --status-bar-border: #007acc;
+  --status-bar-text: rgba(255, 255, 255, 0.95);
+  --text-primary: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --link-color: #569cd6;
+  --card-bg: #252526;
+  --card-border: #333333;
+  --root-bg: #1e1e1e;
+  --root-text: #cccccc;
+  --close-tab-hover-bg: #52525b;
+}
+
+.theme-root a[href].link-theme {
+  color: var(--link-color);
+}
+
+.theme-root a[href].link-theme:hover {
+  text-decoration: underline;
+}
+
+.theme-root .sidebar-file:hover {
+  background: var(--sidebar-hover-bg) !important;
+}

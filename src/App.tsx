@@ -216,6 +216,28 @@ const IconGraduation = () => (
   </svg>
 );
 
+const IconMenu = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="20" y2="12" />
+    <line x1="4" y1="18" x2="20" y2="18" />
+  </svg>
+);
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatches(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [query]);
+  return matches;
+}
+
 function App() {
   const [activeFile, setActiveFile] = useState<FileId>("readme");
   const [openTabs, setOpenTabs] = useState<FileId[]>(["readme"]);
@@ -260,6 +282,31 @@ function App() {
   const [contactStatus, setContactStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [contactUsedMailto, setContactUsedMailto] = useState(false);
 
+  const isCompactLayout = useMediaQuery("(max-width: 1023px)");
+  const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
+
+  useEffect(() => {
+    if (isCompactLayout) setZoom(DEFAULT_ZOOM);
+  }, [isCompactLayout]);
+
+  useEffect(() => {
+    if (!mobileFilesOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileFilesOpen]);
+
+  useEffect(() => {
+    if (!mobileFilesOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileFilesOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileFilesOpen]);
+
   const filteredFiles = useMemo(() => {
     const q = commandPaletteQuery.trim().toLowerCase();
     if (!q) return FILES;
@@ -270,6 +317,7 @@ function App() {
   const selectedIndex = Math.min(commandPaletteSelectedIndex, Math.max(0, totalPaletteItems - 1));
 
   const openCommandPalette = () => {
+    setMobileFilesOpen(false);
     setCommandPaletteOpen(true);
     setCommandPaletteQuery("");
     setCommandPaletteSelectedIndex(0);
@@ -281,6 +329,7 @@ function App() {
   };
 
   const openCopilot = () => {
+    setMobileFilesOpen(false);
     setCopilotOpen(true);
   };
 
@@ -466,6 +515,7 @@ function App() {
   const openTab = (id: FileId) => {
     setActiveFile(id);
     if (!openTabs.includes(id)) setOpenTabs([...openTabs, id]);
+    setMobileFilesOpen(false);
   };
 
   const closeTab = (id: FileId, e?: React.MouseEvent) => {
@@ -503,6 +553,7 @@ function App() {
       : `${window.location.origin}${profile.resumePdfUrl.startsWith("/") ? "" : "/"}${profile.resumePdfUrl}`;
 
   const handleResumeDownload = () => {
+    setMobileFilesOpen(false);
     if (profile.resumePdfUrl.startsWith("http")) {
       window.open(resumeFullUrl, "_blank", "noopener,noreferrer");
       return;
@@ -617,11 +668,14 @@ function App() {
 
   return (
     <div
-      className="theme-root flex h-screen flex-col font-sans text-[13px] antialiased"
+      className="theme-root flex min-h-[100dvh] flex-col font-sans text-[13px] antialiased"
       style={{
         ...themeStyle,
         backgroundColor: "var(--root-bg)",
         color: "var(--root-text)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       <CustomCursor />
@@ -630,7 +684,7 @@ function App() {
         style={{ minHeight: 0 }}
       >
         <div
-          className="zoom-inner flex flex-col"
+          className="zoom-inner flex min-h-0 flex-1 flex-col"
           style={{
             transform: `scale(${zoom})`,
             transformOrigin: "0 0",
@@ -640,16 +694,30 @@ function App() {
         >
       {/* Title bar */}
       <header
-        className="flex h-12 shrink-0 items-center border-b pl-3 pr-4"
-        style={{ borderColor: "var(--title-bar-border)", backgroundColor: "var(--title-bar-bg)" }}
+        className="flex h-12 min-h-12 shrink-0 items-center gap-2 border-b px-2 sm:px-3 lg:pl-3 lg:pr-4"
+        style={{
+          borderColor: "var(--title-bar-border)",
+          backgroundColor: "var(--title-bar-bg)",
+          paddingTop: "max(0px, env(safe-area-inset-top))",
+        }}
       >
-        <div className="flex items-center gap-4">
-          <div className="flex gap-2">
-            <div className="h-3 w-3 rounded-full bg-[#ff5f56]" />
-            <div className="h-3 w-3 rounded-full bg-[#ffbd2e]" />
-            <div className="h-3 w-3 rounded-full bg-[#27c93f]" />
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3 lg:gap-4">
+          <div className="hidden gap-2 sm:flex">
+            <div className="h-2.5 w-2.5 rounded-full bg-[#ff5f56] sm:h-3 sm:w-3" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e] sm:h-3 sm:w-3" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#27c93f] sm:h-3 sm:w-3" />
           </div>
-          <div className="flex gap-1 text-[12px]" style={{ color: "var(--title-bar-text)" }}>
+          <button
+            type="button"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-white/10 lg:hidden"
+            style={{ color: "var(--title-bar-text)" }}
+            aria-label="Open file explorer"
+            aria-expanded={mobileFilesOpen}
+            onClick={() => setMobileFilesOpen((o) => !o)}
+          >
+            <IconMenu />
+          </button>
+          <div className="hidden gap-1 text-[12px] lg:flex" style={{ color: "var(--title-bar-text)" }}>
             {["File", "Edit", "View", "Go", "Run", "Terminal", "Help", "Copilot"].map((m) =>
               m === "File" ? (
                 <div
@@ -915,17 +983,17 @@ function App() {
         </div>
         <button
           type="button"
-          className="mx-auto flex max-w-xl flex-1 items-center justify-center gap-2 rounded px-3 py-1.5 hover:opacity-90"
+          className="mx-auto flex min-h-11 min-w-0 max-w-xl flex-1 items-center justify-center gap-1.5 rounded px-2 py-2 hover:opacity-90 sm:gap-2 sm:px-3 sm:py-1.5"
           style={{ backgroundColor: "var(--command-palette-bg)", color: "var(--title-bar-text)" }}
           onClick={openCommandPalette}
           title="Quick Open (Ctrl+P)"
         >
-          <span style={{ color: "var(--text-primary)" }}>aryan-gupta</span>
-          <span>:</span>
-          <span>portfolio</span>
-          <span className="ml-2 text-[11px] opacity-70">Ctrl+P</span>
+          <span className="truncate" style={{ color: "var(--text-primary)" }}>aryan-gupta</span>
+          <span className="shrink-0">:</span>
+          <span className="truncate">portfolio</span>
+          <span className="ml-1 hidden shrink-0 text-[11px] opacity-70 sm:ml-2 sm:inline">Ctrl+P</span>
         </button>
-        <div className="w-32" />
+        <div className="hidden w-8 shrink-0 lg:block lg:w-32" />
       </header>
       {(fileMenuOpen || editMenuOpen || viewMenuOpen || helpMenuOpen) && (
         <div
@@ -944,7 +1012,7 @@ function App() {
             aria-hidden
           />
           <div
-            className="fixed left-1/2 top-[20%] z-[101] w-full max-w-2xl -translate-x-1/2 rounded-lg border shadow-2xl"
+            className="fixed left-4 right-4 top-[10%] z-[101] max-h-[min(70dvh,32rem)] max-w-2xl overflow-hidden rounded-lg border shadow-2xl sm:left-1/2 sm:right-auto sm:top-[20%] sm:w-full sm:max-w-2xl sm:-translate-x-1/2"
             style={{
               backgroundColor: "var(--sidebar-bg)",
               borderColor: "var(--sidebar-border)",
@@ -1014,15 +1082,15 @@ function App() {
               })}
             </div>
             <div
-              className="flex items-center justify-between border-t px-3 py-1.5 text-[11px]"
+              className="flex flex-col gap-1 border-t px-3 py-1.5 text-[11px] sm:flex-row sm:items-center sm:justify-between"
               style={{ borderColor: "var(--sidebar-border)", color: "var(--text-muted)" }}
             >
-              <span className="flex items-center gap-4">
+              <span className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <span>↑↓ navigate</span>
                 <span>↵ open</span>
                 <span>Esc close</span>
               </span>
-              <span>Tip: type &apos;copilot&apos; to open AI chat</span>
+              <span className="hidden sm:inline">Tip: type &apos;copilot&apos; to open AI chat</span>
             </div>
           </div>
         </>
@@ -1123,7 +1191,7 @@ function App() {
                       Ask me anything about his projects, skills, experience, or achievements.
                     </p>
                   </div>
-                  <div className="mt-8 grid grid-cols-2 gap-2">
+                  <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {[
                       "Tell me about Aryan?",
                       "What projects has Aryan built?",
@@ -1233,10 +1301,113 @@ function App() {
         </>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
+        {/* Mobile file drawer */}
+        {mobileFilesOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-[85] bg-black/50 backdrop-blur-[2px] lg:hidden"
+              onClick={() => setMobileFilesOpen(false)}
+              aria-hidden
+            />
+            <aside
+              className="fixed inset-y-0 left-0 z-[86] flex max-h-[100dvh] w-[min(20rem,92vw)] flex-col border-r shadow-2xl lg:hidden"
+              style={{
+                borderColor: "var(--sidebar-border)",
+                backgroundColor: "var(--sidebar-bg)",
+                paddingLeft: "max(0px, env(safe-area-inset-left))",
+                paddingTop: "max(0px, env(safe-area-inset-top))",
+              }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="File explorer"
+            >
+              <div
+                className="flex h-12 shrink-0 items-center justify-between border-b px-3"
+                style={{ borderColor: "var(--sidebar-border)" }}
+              >
+                <span
+                  className="text-[11px] font-medium uppercase tracking-wider"
+                  style={{ color: "var(--sidebar-header-text)" }}
+                >
+                  Portfolio
+                </span>
+                <button
+                  type="button"
+                  className="flex h-10 w-10 items-center justify-center rounded-md text-lg leading-none hover:bg-white/10"
+                  style={{ color: "var(--text-muted)" }}
+                  aria-label="Close file explorer"
+                  onClick={() => setMobileFilesOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex gap-1 border-b px-2 py-2" style={{ borderColor: "var(--sidebar-border)" }}>
+                <button
+                  type="button"
+                  className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md border px-2 text-[12px] font-medium hover:opacity-90"
+                  style={{
+                    borderColor: "var(--card-border)",
+                    backgroundColor: "var(--card-bg)",
+                    color: "var(--text-primary)",
+                  }}
+                  onClick={() => {
+                    setMobileFilesOpen(false);
+                    openCommandPalette();
+                  }}
+                >
+                  <IconSearch />
+                  Search
+                </button>
+                <button
+                  type="button"
+                  className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md border px-2 text-[12px] font-medium hover:opacity-90"
+                  style={{
+                    borderColor: "var(--card-border)",
+                    backgroundColor: "var(--card-bg)",
+                    color: "var(--text-primary)",
+                  }}
+                  onClick={() => {
+                    setMobileFilesOpen(false);
+                    openCopilot();
+                  }}
+                >
+                  <IconAIAssistant />
+                  Copilot
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto py-1">
+                {FILES.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      if (f.id === "resume") {
+                        handleResumeDownload();
+                      } else {
+                        openTab(f.id);
+                      }
+                    }}
+                    className={`sidebar-file flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left ${f.id === "resume" ? "opacity-90" : ""}`}
+                    style={{
+                      backgroundColor: activeFile === f.id ? "var(--sidebar-selected-bg)" : "transparent",
+                      color: activeFile === f.id ? "var(--text-primary)" : undefined,
+                    }}
+                  >
+                    <span className="text-[16px] font-medium text-amber-500/90">
+                      {f.icon === "tsx" ? "⚛" : f.icon === "md" ? "📄" : f.icon === "pdf" ? "📕" : "▤"}
+                    </span>
+                    <span className="truncate text-[13px]">{f.label}</span>
+                  </button>
+                ))}
+              </div>
+            </aside>
+          </>
+        )}
+
         {/* Activity bar */}
         <aside
-          className="flex w-12 shrink-0 flex-col items-center border-r py-2"
+          className="hidden w-12 shrink-0 flex-col items-center border-r py-2 lg:flex"
           style={{ borderColor: "var(--activity-bar-border)", backgroundColor: "var(--activity-bar-bg)" }}
         >
           <button
@@ -1308,7 +1479,7 @@ function App() {
 
         {/* Sidebar */}
         <aside
-          className="flex w-56 shrink-0 flex-col border-r"
+          className="hidden w-56 shrink-0 flex-col border-r lg:flex"
           style={{ borderColor: "var(--sidebar-border)", backgroundColor: "var(--sidebar-bg)" }}
         >
           <div
@@ -1345,8 +1516,9 @@ function App() {
         <div className="flex flex-1 flex-col min-w-0">
           {/* Tabs */}
           <div
-            className="flex shrink-0 items-end border-b"
+            className="tabs-scroll flex shrink-0 items-end overflow-x-auto overflow-y-hidden border-b"
             style={{ borderColor: "var(--tab-bar-border)", backgroundColor: "var(--tab-bar-bg)" }}
+            onClick={() => setMobileFilesOpen(false)}
           >
             {openTabs.map((id) => {
               const f = FILES.find((x) => x.id === id)!;
@@ -1355,7 +1527,7 @@ function App() {
                 <div
                   key={id}
                   onClick={() => setActiveFile(id)}
-                  className="group flex cursor-pointer items-center gap-2 border-r px-3 py-2"
+                  className="group flex shrink-0 cursor-pointer items-center gap-2 border-r px-3 py-2"
                   style={{
                     borderColor: "var(--tab-bar-border)",
                     borderBottomWidth: isActive ? 2 : 0,
@@ -1364,12 +1536,14 @@ function App() {
                     color: isActive ? "var(--tab-text-active)" : "var(--tab-text)",
                   }}
                 >
-                  <span className="text-[14px]">{f.icon === "md" ? "📄" : "▤"}</span>
-                  <span className="max-w-[120px] truncate">{f.label}</span>
+                  <span className="shrink-0 text-[14px]">{f.icon === "md" ? "📄" : "▤"}</span>
+                  <span className="max-w-[72px] truncate sm:max-w-[120px]">{f.label}</span>
                   <button
+                    type="button"
                     onClick={(e) => closeTab(id, e)}
-                    className="ml-1 rounded p-0.5 opacity-0 group-hover:opacity-100"
+                    className="ml-1 min-h-8 min-w-8 shrink-0 rounded p-1 opacity-100 hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
                     style={{ backgroundColor: "var(--close-tab-hover-bg)" }}
+                    aria-label={`Close ${f.label}`}
                   >
                     ✕
                   </button>
@@ -1380,24 +1554,25 @@ function App() {
 
           {/* Breadcrumbs */}
           <div
-            className="flex shrink-0 items-center gap-1 border-b px-3 py-1 text-[12px]"
+            className="flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto border-b px-3 py-1 text-[12px]"
             style={{ borderColor: "var(--tab-bar-border)", backgroundColor: "var(--breadcrumb-bg)", color: "var(--breadcrumb-text)" }}
+            onClick={() => setMobileFilesOpen(false)}
           >
             <span>aryan-gupta</span>
             <span>&gt;</span>
-            <span style={{ color: "var(--breadcrumb-text-active)" }}>{FILES.find((f) => f.id === activeFile)?.label}</span>
+            <span className="min-w-0 truncate" style={{ color: "var(--breadcrumb-text-active)" }}>{FILES.find((f) => f.id === activeFile)?.label}</span>
           </div>
 
           {/* Editor content */}
           <div
             ref={editorContentRef}
             tabIndex={-1}
-            className="flex-1 overflow-auto p-6 outline-none"
+            className="flex-1 overflow-auto p-4 pb-6 outline-none sm:p-6"
             style={{ backgroundColor: "var(--editor-bg)" }}
           >
             {activeFile === "readme" && (
               <div className="max-w-3xl space-y-6">
-                <h1 className="text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
+                <h1 className="break-words text-xl font-semibold sm:text-2xl" style={{ color: "var(--text-primary)" }}>
                   {profile.title} @ {profile.company.replace("@ ", "")} • India 🇮🇳
                 </h1>
                 <div className="flex flex-wrap gap-2">
@@ -1450,7 +1625,7 @@ function App() {
                   // hello world — welcome to my portfolio
                 </p>
                 <div className="space-y-4">
-                  <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+                  <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                     <span style={{ color: "var(--text-primary)" }}>{profile.name.split(" ")[0]}</span>
                     <span className="ml-2" style={{ color: "var(--link-color)" }}>{profile.name.split(" ")[1]}</span>
                   </h1>
@@ -1712,7 +1887,7 @@ function App() {
             {activeFile === "skills" && (
               <div className="max-w-3xl space-y-6">
                 <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>Technical Skills</h2>
-                <pre className="overflow-auto rounded border p-4 text-[13px]" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)", color: "var(--text-secondary)" }}>
+                <pre className="max-w-full overflow-x-auto rounded border p-3 text-[11px] sm:p-4 sm:text-[13px]" style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)", color: "var(--text-secondary)" }}>
 {JSON.stringify(skills, null, 2)}
                 </pre>
               </div>
@@ -1835,21 +2010,21 @@ function App() {
 
       {/* Status bar */}
       <footer
-        className="relative flex h-7 shrink-0 items-center justify-between border-t px-3 text-[12px]"
+        className="relative flex min-h-8 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-2 py-1 text-[11px] sm:h-7 sm:flex-nowrap sm:px-3 sm:text-[12px]"
         style={{ borderColor: "var(--status-bar-border)", backgroundColor: "var(--status-bar-bg)", color: "var(--status-bar-text)" }}
       >
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-4">
+          <span className="flex shrink-0 items-center gap-1">
             <span>◆</span> main
           </span>
-          <span>↻</span>
-          <span>Aryan's Portfolio</span>
+          <span className="hidden sm:inline">↻</span>
+          <span className="min-w-0 truncate max-sm:max-w-[40vw]">Aryan&apos;s Portfolio</span>
         </div>
-        <div className="flex items-center gap-4">
-          <span>Copilot</span>
-          <span>Markdown</span>
-          <span>UTF-8</span>
-          <span>Prettier</span>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-4">
+          <span className="hidden sm:inline">Copilot</span>
+          <span className="hidden md:inline">Markdown</span>
+          <span className="hidden lg:inline">UTF-8</span>
+          <span className="hidden lg:inline">Prettier</span>
           <button
             type="button"
             onClick={() => setThemePickerOpen((o) => !o)}
@@ -1892,8 +2067,8 @@ function App() {
               </div>
             </>
           )}
-          <span>{new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
-          <span className="flex items-center gap-1" title="Zoom (Ctrl+Plus / Ctrl+Minus / Ctrl+0)">
+          <span className="tabular-nums">{new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+          <span className="hidden items-center gap-1 lg:flex" title="Zoom (Ctrl+Plus / Ctrl+Minus / Ctrl+0)">
             <button type="button" onClick={zoomOut} className="rounded px-1 py-0.5 hover:bg-white/15" aria-label="Zoom out" disabled={zoom <= ZOOM_LEVELS[0]}>−</button>
             <button type="button" onClick={zoomReset} className="min-w-[3ch] rounded px-1 py-0.5 hover:bg-white/15" title="Reset zoom">{Math.round(zoom * 100)}%</button>
             <button type="button" onClick={zoomIn} className="rounded px-1 py-0.5 hover:bg-white/15" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}>+</button>

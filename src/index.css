@@ -5,6 +5,31 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* Mobile: comfortable scrolling + notches */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+/* Thin scrollbar for horizontal tab strip on small screens */
+.tabs-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tab-bar-border) transparent;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs-scroll::-webkit-scrollbar-thumb {
+  background: var(--tab-bar-border);
+  border-radius: 3px;
+}
+
 /* Theme root: app applies CSS variables via inline style */
 .theme-root {
   --title-bar-bg: #323233;

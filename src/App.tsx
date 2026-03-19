@@ -259,7 +259,9 @@ function App() {
     } catch (_) {}
     return DEFAULT_ZOOM;
   });
-  const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [editMenuOpen, setEditMenuOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -693,6 +695,17 @@ function App() {
         e.preventDefault();
         toggleTerminal();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "b") {
+        e.preventDefault();
+        setSidebarHidden((h) => !h);
+      }
+      if (e.key === "F1") {
+        e.preventDefault();
+        setFullscreen((f) => !f);
+      }
+      if (e.key === "Escape") {
+        setSettingsPanelOpen(false);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -709,6 +722,21 @@ function App() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [copilotOpen]);
+
+  useEffect(() => {
+    const el = document.documentElement;
+    if (fullscreen) {
+      el.requestFullscreen?.().catch(() => setFullscreen(false));
+    } else {
+      if (document.fullscreenElement) document.exitFullscreen?.();
+    }
+  }, [fullscreen]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
 
   useEffect(() => {
     try {
@@ -975,6 +1003,18 @@ function App() {
           >
             <IconMenu />
           </button>
+          {sidebarHidden && (
+            <button
+              type="button"
+              className="hidden lg:flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-white/10"
+              style={{ color: "var(--title-bar-text)" }}
+              onClick={() => setSidebarHidden(false)}
+              title="Show sidebar (Ctrl+B)"
+              aria-label="Show sidebar"
+            >
+              <IconExplorer />
+            </button>
+          )}
           <div className="hidden gap-1 text-[12px] lg:flex" style={{ color: "var(--title-bar-text)" }}>
             {["File", "Edit", "View", "Go", "Run", "Terminal", "Help", "Copilot"].map((m) =>
               m === "File" ? (
@@ -1384,6 +1424,163 @@ function App() {
         />
       )}
 
+      {/* Settings panel */}
+      {settingsPanelOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[97] bg-black/40 backdrop-blur-sm"
+            onClick={() => setSettingsPanelOpen(false)}
+            aria-hidden
+          />
+          <aside
+            className="fixed right-0 top-0 z-[98] flex h-full w-full max-w-md flex-col border-l shadow-2xl"
+            style={{
+              backgroundColor: "var(--editor-bg)",
+              borderColor: "var(--sidebar-border)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+          >
+            <div
+              className="flex shrink-0 items-center justify-between border-b px-4 py-3"
+              style={{ borderColor: "var(--sidebar-border)" }}
+            >
+              <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--text-primary)" }}>
+                Settings
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSettingsPanelOpen(false)}
+                className="rounded p-2 hover:bg-white/10"
+                style={{ color: "var(--text-muted)" }}
+                aria-label="Close settings"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto px-4 py-5">
+              <section className="mb-6">
+                <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Color theme
+                </h3>
+                <div className="space-y-1">
+                  {THEME_IDS.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setThemeId(id)}
+                      className="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors"
+                      style={{
+                        borderColor: themeId === id ? "var(--tab-active-border)" : "var(--card-border)",
+                        backgroundColor: themeId === id ? "var(--sidebar-selected-bg)" : "var(--card-bg)",
+                        color: themeId === id ? "var(--text-primary)" : "var(--text-secondary)",
+                        borderLeftWidth: themeId === id ? 3 : 1,
+                        borderLeftColor: themeId === id ? "var(--tab-active-border)" : undefined,
+                      }}
+                    >
+                      {THEME_LABELS[id]}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="mb-6">
+                <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Quick actions
+                </h3>
+                <div className="space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsPanelOpen(false); openCommandPalette(); }}
+                    className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                    style={{ borderColor: "var(--card-border)", color: "var(--text-primary)" }}
+                  >
+                    <span>Command Palette</span>
+                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Ctrl+P</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsPanelOpen(false); toggleTerminal(); }}
+                    className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                    style={{ borderColor: "var(--card-border)", color: "var(--text-primary)" }}
+                  >
+                    <span>Toggle Terminal</span>
+                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Ctrl+`</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsPanelOpen(false); openCopilot(); }}
+                    className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                    style={{ borderColor: "var(--card-border)", color: "var(--text-primary)" }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden>✨</span>
+                      Copilot Chat
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsPanelOpen(false); handleResumeDownload(); }}
+                    className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                    style={{ borderColor: "var(--card-border)", color: "var(--text-primary)" }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden>📄</span>
+                      Download Resume
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsPanelOpen(false); setFullscreen((f) => !f); }}
+                    className="flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                    style={{ borderColor: "var(--card-border)", color: "var(--text-primary)" }}
+                  >
+                    <span>Toggle Fullscreen</span>
+                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>F1</span>
+                  </button>
+                </div>
+              </section>
+              <section className="mb-6">
+                <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Keyboard shortcuts
+                </h3>
+                <div className="space-y-2 font-mono text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                  <div className="flex justify-between gap-4 rounded border px-3 py-2" style={{ borderColor: "var(--card-border)" }}>
+                    <span>Ctrl+P</span>
+                    <span>Go to file (command palette)</span>
+                  </div>
+                  <div className="flex justify-between gap-4 rounded border px-3 py-2" style={{ borderColor: "var(--card-border)" }}>
+                    <span>Ctrl+`</span>
+                    <span>Toggle terminal</span>
+                  </div>
+                  <div className="flex justify-between gap-4 rounded border px-3 py-2" style={{ borderColor: "var(--card-border)" }}>
+                    <span>Ctrl+B</span>
+                    <span>Toggle sidebar</span>
+                  </div>
+                  <div className="flex justify-between gap-4 rounded border px-3 py-2" style={{ borderColor: "var(--card-border)" }}>
+                    <span>Esc</span>
+                    <span>Close overlay</span>
+                  </div>
+                  <div className="flex justify-between gap-4 rounded border px-3 py-2" style={{ borderColor: "var(--card-border)" }}>
+                    <span>↑ / ↓</span>
+                    <span>Terminal history</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <footer
+              className="shrink-0 border-t px-4 py-2.5 text-[11px]"
+              style={{ borderColor: "var(--sidebar-border)", color: "var(--text-muted)" }}
+            >
+              Portfolio v3.0 · React, Vite, Tailwind CSS
+            </footer>
+          </aside>
+        </>
+      )}
+
       {/* Command Palette / Quick Open */}
       {commandPaletteOpen && (
         <>
@@ -1786,9 +1983,14 @@ function App() {
           </>
         )}
 
+        {/* Activity bar + Sidebar (toggle with Ctrl+B) */}
+        <div
+          className={sidebarHidden ? "hidden" : "hidden lg:flex"}
+          style={{ flexShrink: 0 }}
+        >
         {/* Activity bar */}
         <aside
-          className="hidden w-12 shrink-0 flex-col items-center border-r py-2 lg:flex"
+          className="w-12 shrink-0 flex flex-col items-center border-r py-2"
           style={{ borderColor: "var(--activity-bar-border)", backgroundColor: "var(--activity-bar-bg)" }}
         >
           <button
@@ -1862,10 +2064,13 @@ function App() {
           </button>
           <div className="mt-auto flex flex-col gap-1">
             <button
-              onClick={() => setThemePickerOpen((o) => !o)}
+              onClick={() => setSettingsPanelOpen(true)}
               className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90"
-              style={{ color: "var(--activity-bar-text)" }}
-              title="Settings (Theme)"
+              style={{
+                backgroundColor: settingsPanelOpen ? "var(--activity-bar-active-bg)" : "transparent",
+                color: settingsPanelOpen ? "var(--text-primary)" : "var(--activity-bar-text)",
+              }}
+              title="Settings"
             >
               <IconSettings />
             </button>
@@ -2156,6 +2361,7 @@ function App() {
 
           </div>
         </aside>
+        </div>
 
         {/* Editor area */}
         <div className="flex flex-1 flex-col min-w-0">
@@ -2802,11 +3008,33 @@ function App() {
         style={{ borderColor: "var(--status-bar-border)", backgroundColor: "var(--status-bar-bg)", color: "var(--status-bar-text)" }}
       >
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-4">
-          <span className="flex shrink-0 items-center gap-1">
-            <span>◆</span> main
-          </span>
-          <span className="hidden sm:inline">↻</span>
-          <span className="min-w-0 truncate max-sm:max-w-[40vw]">Aryan&apos;s Portfolio</span>
+          <a
+            href={profile.links.github}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-white/15"
+            title="View on GitHub (main branch)"
+          >
+            <span>◆</span>
+            <span>main</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="hidden sm:inline-flex shrink-0 items-center justify-center rounded p-1 transition-colors hover:bg-white/15"
+            title="Refresh page"
+            aria-label="Refresh"
+          >
+            ↻
+          </button>
+          <button
+            type="button"
+            onClick={() => openTab("home")}
+            className="min-w-0 truncate max-sm:max-w-[40vw] rounded px-1 py-0.5 text-left transition-colors hover:bg-white/15"
+            title="Go to Home"
+          >
+            Aryan&apos;s Portfolio
+          </button>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-4">
           <span className="hidden sm:inline">Copilot</span>
@@ -2815,46 +3043,12 @@ function App() {
           <span className="hidden lg:inline">Prettier</span>
           <button
             type="button"
-            onClick={() => setThemePickerOpen((o) => !o)}
+            onClick={() => setSettingsPanelOpen(true)}
             className="rounded px-1 py-0.5 hover:bg-white/15"
-            title="Change color theme"
+            title="Settings"
           >
             {getThemeLabel(themeId)}
           </button>
-          {themePickerOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setThemePickerOpen(false)} aria-hidden />
-              <div
-                className="absolute bottom-full right-0 z-50 mb-1 min-w-[160px] rounded border py-1 shadow-lg"
-                style={{
-                  backgroundColor: "var(--sidebar-bg)",
-                  borderColor: "var(--sidebar-border)",
-                  color: "var(--root-text)",
-                }}
-              >
-                <div className="border-b px-3 py-1.5 text-[11px] font-medium" style={{ borderColor: "var(--sidebar-border)", color: "var(--sidebar-header-text)" }}>
-                  Color Theme
-                </div>
-                {THEME_IDS.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-white/10"
-                    style={{
-                      color: themeId === id ? "var(--text-primary)" : "var(--text-muted)",
-                      backgroundColor: themeId === id ? "var(--sidebar-selected-bg)" : "transparent",
-                    }}
-                    onClick={() => {
-                      setThemeId(id);
-                      setThemePickerOpen(false);
-                    }}
-                  >
-                    {THEME_LABELS[id]}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
           <span className="tabular-nums">{new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
           <span className="hidden items-center gap-1 lg:flex" title="Zoom (Ctrl+Plus / Ctrl+Minus / Ctrl+0)">
             <button type="button" onClick={zoomOut} className="rounded px-1 py-0.5 hover:bg-white/15" aria-label="Zoom out" disabled={zoom <= ZOOM_LEVELS[0]}>−</button>

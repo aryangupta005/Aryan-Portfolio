@@ -1,6 +1,6 @@
 # Aryan Gupta | Portfolio
 
-A personal portfolio site inspired by [Aahana Bobade's portfolio](https://aahanabobade-portfolio.vercel.app/), built with **React**, **TypeScript**, **Vite**, and **Tailwind CSS**.
+A personal portfolio site built with **React**, **TypeScript**, **Vite**, and **Tailwind CSS**.
 
 ## Features
 

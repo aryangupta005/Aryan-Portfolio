@@ -80,3 +80,32 @@ body {
 .theme-root .sidebar-file:hover {
   background: var(--sidebar-hover-bg) !important;
 }
+
+/* Terminal panel */
+.terminal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sidebar-border) transparent;
+}
+
+.terminal-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: var(--sidebar-border);
+  border-radius: 3px;
+}
+
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background: var(--text-primary, #fff);
+  animation: terminal-blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}

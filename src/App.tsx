@@ -241,7 +241,7 @@ function useMediaQuery(query: string): boolean {
 function App() {
   const [activeFile, setActiveFile] = useState<FileId>("readme");
   const [openTabs, setOpenTabs] = useState<FileId[]>(["readme"]);
-  const [activeSidebar, setActiveSidebar] = useState<"explorer" | "search">("explorer");
+  const [activeSidebar, setActiveSidebar] = useState<"explorer" | "search" | "source-control" | "extensions" | "portfolio">("explorer");
   const [themeId, setThemeId] = useState(() => {
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
@@ -263,6 +263,8 @@ function App() {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [editMenuOpen, setEditMenuOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const [goMenuOpen, setGoMenuOpen] = useState(false);
+  const [runMenuOpen, setRunMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const editorContentRef = useRef<HTMLDivElement>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -274,6 +276,17 @@ function App() {
   const [copilotInput, setCopilotInput] = useState("");
   const copilotScrollRef = useRef<HTMLDivElement>(null);
   const COPILOT_MSG_LIMIT = 10; // demo limit for "X msgs left"
+
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalTab, setTerminalTab] = useState<"terminal" | "problems" | "output">("terminal");
+  const [terminalHistory, setTerminalHistory] = useState<{ type: "input" | "output"; text: string }[]>([
+    { type: "output", text: "Welcome! Type 'help' to see available commands." },
+  ]);
+  const [terminalInput, setTerminalInput] = useState("");
+  const [terminalCmdHistory, setTerminalCmdHistory] = useState<string[]>([]);
+  const [terminalCmdIndex, setTerminalCmdIndex] = useState(-1);
+  const terminalScrollRef = useRef<HTMLDivElement>(null);
+  const terminalInputRef = useRef<HTMLInputElement>(null);
 
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -377,6 +390,238 @@ function App() {
 
   const copilotMessagesLeft = Math.max(0, COPILOT_MSG_LIMIT - copilotMessages.filter((m) => m.role === "user").length);
 
+  const toggleTerminal = () => setTerminalOpen((o) => !o);
+  const openTerminal = () => {
+    setTerminalOpen(true);
+    setTerminalTab("terminal");
+    setTimeout(() => terminalInputRef.current?.focus(), 0);
+  };
+
+  const processTerminalCommand = (raw: string) => {
+    const cmd = raw.trim().toLowerCase();
+    const args = cmd.split(/\s+/);
+    const base = args[0];
+
+    if (!cmd) return;
+
+    setTerminalHistory((h) => [...h, { type: "input", text: raw }]);
+    setTerminalCmdHistory((h) => [raw, ...h]);
+    setTerminalCmdIndex(-1);
+    setTerminalInput("");
+
+    let output = "";
+
+    switch (base) {
+      case "help":
+        output = [
+          "Available commands:",
+          "",
+          "  help              Show this help message",
+          "  about             About Aryan",
+          "  skills            List technical skills",
+          "  experience        Show work experience",
+          "  projects          List projects",
+          "  education         Show education",
+          "  contact           Show contact info",
+          "  open <file>       Open a file tab (e.g. open home)",
+          "  theme [name]      Show or change theme",
+          "  ls                List portfolio files",
+          "  whoami            Who am I?",
+          "  date              Show current date/time",
+          "  clear             Clear terminal",
+          "  echo <text>       Print text",
+          "  resume            Download resume",
+          "  socials           Show social links",
+          "  neofetch          System info",
+          "",
+          "Tip: Use ↑/↓ arrows to navigate command history.",
+        ].join("\n");
+        break;
+
+      case "about":
+        output = [
+          `${profile.name} — ${profile.title}`,
+          `${profile.subtitle}`,
+          `${profile.company}`,
+          "",
+          profile.tagline,
+          "",
+          "B.Tech in Information Technology @ GGSIPU, New Delhi.",
+          `Email: ${profile.email}`,
+          `Phone: ${profile.phone}`,
+        ].join("\n");
+        break;
+
+      case "skills": {
+        const fmt = (label: string, items: string[]) => `  ${label}: ${items.join(", ")}`;
+        output = [
+          "Technical Skills:",
+          "",
+          fmt("Languages", skills.languages),
+          fmt("Web", skills.web),
+          fmt("Tools", skills.tools),
+          fmt("Fundamentals", skills.fundamentals),
+        ].join("\n");
+        break;
+      }
+
+      case "experience":
+        output = experience
+          .map(
+            (e) =>
+              `${e.company} — ${e.role}\n  ${e.location} | ${e.period}\n  ${e.points[0]}`
+          )
+          .join("\n\n");
+        break;
+
+      case "projects":
+        output = projects
+          .map(
+            (p) =>
+              `${p.name}\n  Stack: ${p.stack}\n  GitHub: ${p.github}${"live" in p && p.live ? `\n  Live: ${p.live}` : ""}`
+          )
+          .join("\n\n");
+        break;
+
+      case "education":
+        output = education
+          .map((e) => `${e.school}\n  ${e.degree} | ${e.period}\n  ${e.detail}`)
+          .join("\n\n");
+        break;
+
+      case "contact":
+        output = [
+          "Contact Aryan:",
+          "",
+          `  Email:    ${profile.email}`,
+          `  Phone:    ${profile.phone}`,
+          `  GitHub:   ${profile.links.github}`,
+          `  LinkedIn: ${profile.links.linkedin}`,
+          `  LeetCode: ${profile.links.leetcode}`,
+        ].join("\n");
+        break;
+
+      case "socials":
+        output = [
+          "Social Links:",
+          "",
+          `  GitHub:   ${profile.links.github}`,
+          `  LinkedIn: ${profile.links.linkedin}`,
+          `  LeetCode: ${profile.links.leetcode}`,
+          `  Email:    ${profile.links.email}`,
+        ].join("\n");
+        break;
+
+      case "open": {
+        const target = args[1];
+        if (!target) {
+          output = `Usage: open <file>\nAvailable: ${FILES.map((f) => f.id).join(", ")}`;
+        } else {
+          const file = FILES.find((f) => f.id === target || f.label.toLowerCase().startsWith(target));
+          if (file) {
+            if (file.id === "resume") {
+              handleResumeDownload();
+              output = `Downloading ${file.label}...`;
+            } else {
+              openTab(file.id);
+              output = `Opened ${file.label}`;
+            }
+          } else {
+            output = `File not found: ${target}\nAvailable: ${FILES.map((f) => f.id).join(", ")}`;
+          }
+        }
+        break;
+      }
+
+      case "theme": {
+        const target = args[1];
+        if (!target) {
+          output = `Current theme: ${getThemeLabel(themeId)}\nAvailable: ${THEME_IDS.map((id) => `${id} (${THEME_LABELS[id]})`).join(", ")}`;
+        } else {
+          const match = THEME_IDS.find((id) => id === target || id.includes(target));
+          if (match) {
+            setThemeId(match);
+            output = `Theme changed to ${THEME_LABELS[match]}`;
+          } else {
+            output = `Unknown theme: ${target}\nAvailable: ${THEME_IDS.join(", ")}`;
+          }
+        }
+        break;
+      }
+
+      case "ls":
+        output = FILES.map((f) => `  ${f.path}${f.label}`).join("\n");
+        break;
+
+      case "whoami":
+        output = `visitor@${profile.name.toLowerCase().replace(/\s+/g, "-")}-portfolio`;
+        break;
+
+      case "date":
+        output = new Date().toString();
+        break;
+
+      case "clear":
+        setTerminalHistory([]);
+        return;
+
+      case "echo":
+        output = args.slice(1).join(" ") || "";
+        break;
+
+      case "resume":
+        handleResumeDownload();
+        output = "Downloading resume...";
+        break;
+
+      case "neofetch":
+        output = [
+          "       ___       ",
+          "      /   \\      visitor@aryan-portfolio",
+          "     /     \\     -------------------------",
+          "    /  AG   \\    OS: Web Browser",
+          "   /         \\   Host: aryan-portfolio",
+          "  /___________\\  Shell: portfolio-terminal",
+          "                 Theme: " + getThemeLabel(themeId),
+          `                 Framework: React + TypeScript`,
+          `                 Build: Vite`,
+          `                 Styling: Tailwind CSS`,
+          `                 Uptime: since ${new Date().getFullYear()}`,
+        ].join("\n");
+        break;
+
+      case "pwd":
+        output = "/home/visitor/aryan-portfolio";
+        break;
+
+      case "cat":
+        if (args[1]) {
+          output = `Try: open ${args[1].replace(/\.\w+$/, "")}`;
+        } else {
+          output = "Usage: cat <filename>";
+        }
+        break;
+
+      case "cd":
+        output = "Nice try! This is a portfolio, not a real filesystem.";
+        break;
+
+      case "sudo":
+        output = "visitor is not in the sudoers file. This incident will be reported. 😄";
+        break;
+
+      case "exit":
+        setTerminalOpen(false);
+        return;
+
+      default:
+        output = `Command not found: ${base}\nType 'help' for available commands.`;
+    }
+
+    setTerminalHistory((h) => [...h, { type: "output", text: output }]);
+    setTimeout(() => terminalScrollRef.current?.scrollTo({ top: terminalScrollRef.current.scrollHeight, behavior: "smooth" }), 50);
+  };
+
   const selectPaletteItem = (index: number) => {
     if (index === 0) {
       openCopilot();
@@ -443,6 +688,10 @@ function App() {
       if (e.ctrlKey && e.shiftKey && e.key === "C") {
         e.preventDefault();
         openCopilot();
+      }
+      if (e.key === "`" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        toggleTerminal();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -630,6 +879,15 @@ function App() {
 
   const openRecentFileIds: FileId[] = ["home", "about", "projects", "skills"];
 
+  const closeAllMenus = () => {
+    setFileMenuOpen(false);
+    setEditMenuOpen(false);
+    setViewMenuOpen(false);
+    setGoMenuOpen(false);
+    setRunMenuOpen(false);
+    setHelpMenuOpen(false);
+  };
+
   const editMenuFind = () => {
     setEditMenuOpen(false);
     openCommandPalette();
@@ -726,7 +984,7 @@ function App() {
                   tabIndex={0}
                   className="relative cursor-pointer px-2 py-1 rounded hover:bg-white/10"
                   style={{ color: "var(--title-bar-text)" }}
-                  onClick={() => { setViewMenuOpen(false); setEditMenuOpen(false); setHelpMenuOpen(false); setFileMenuOpen((o) => !o); }}
+                  onClick={() => { closeAllMenus(); setFileMenuOpen((o) => !o); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -816,7 +1074,7 @@ function App() {
                   tabIndex={0}
                   className="relative cursor-pointer px-2 py-1 rounded hover:bg-white/10"
                   style={{ color: "var(--title-bar-text)" }}
-                  onClick={() => { setFileMenuOpen(false); setEditMenuOpen((o) => !o); setViewMenuOpen(false); setHelpMenuOpen(false); }}
+                  onClick={() => { closeAllMenus(); setEditMenuOpen((o) => !o); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -869,7 +1127,7 @@ function App() {
                   tabIndex={0}
                   className="relative cursor-pointer px-2 py-1 rounded hover:bg-white/10"
                   style={{ color: "var(--title-bar-text)" }}
-                  onClick={() => { setFileMenuOpen(false); setEditMenuOpen(false); setViewMenuOpen((o) => !o); setHelpMenuOpen(false); }}
+                  onClick={() => { closeAllMenus(); setViewMenuOpen((o) => !o); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -909,6 +1167,119 @@ function App() {
                     </div>
                   )}
                 </div>
+              ) : m === "Go" ? (
+                <div
+                  key={m}
+                  role="button"
+                  tabIndex={0}
+                  className="relative cursor-pointer px-2 py-1 rounded hover:bg-white/10"
+                  style={{ color: "var(--title-bar-text)" }}
+                  onClick={() => { closeAllMenus(); setGoMenuOpen((o) => !o); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setGoMenuOpen((o) => !o);
+                    }
+                  }}
+                >
+                  {m}
+                  {goMenuOpen && (
+                    <div
+                      className="absolute left-0 top-full mt-0.5 z-50 min-w-[220px] rounded border py-1 shadow-lg font-mono text-[13px]"
+                      style={{
+                        backgroundColor: "var(--sidebar-bg)",
+                        borderColor: "var(--sidebar-border)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10"
+                        onClick={() => { closeAllMenus(); openCommandPalette(); }}
+                      >
+                        <span>Go to File...</span>
+                        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Ctrl+P</span>
+                      </button>
+                      <div className="my-1 border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                      <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                        Files
+                      </div>
+                      {FILES.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-white/10"
+                          onClick={() => {
+                            closeAllMenus();
+                            if (f.id === "resume") {
+                              handleResumeDownload();
+                            } else {
+                              openTab(f.id);
+                            }
+                          }}
+                        >
+                          <span className="text-[14px]">{f.icon === "tsx" ? "⚛" : f.icon === "md" ? "📄" : f.icon === "pdf" ? "📕" : "▤"}</span>
+                          <span>{f.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : m === "Run" ? (
+                <div
+                  key={m}
+                  role="button"
+                  tabIndex={0}
+                  className="relative cursor-pointer px-2 py-1 rounded hover:bg-white/10"
+                  style={{ color: "var(--title-bar-text)" }}
+                  onClick={() => { closeAllMenus(); setRunMenuOpen((o) => !o); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setRunMenuOpen((o) => !o);
+                    }
+                  }}
+                >
+                  {m}
+                  {runMenuOpen && (
+                    <div
+                      className="absolute left-0 top-full mt-0.5 z-50 min-w-[220px] rounded border py-1 shadow-lg font-mono text-[13px]"
+                      style={{
+                        backgroundColor: "var(--sidebar-bg)",
+                        borderColor: "var(--sidebar-border)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10"
+                        onClick={() => {
+                          closeAllMenus();
+                          openTerminal();
+                        }}
+                      >
+                        <span>Start Terminal</span>
+                        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Ctrl+`</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10"
+                        onClick={() => {
+                          closeAllMenus();
+                          openTerminal();
+                          setTimeout(() => {
+                            const last = terminalCmdHistory[0];
+                            if (last) {
+                              processTerminalCommand(last);
+                            }
+                          }, 100);
+                        }}
+                      >
+                        <span>Run Last Command</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : m === "Help" ? (
                 <div
                   key={m}
@@ -916,7 +1287,7 @@ function App() {
                   tabIndex={0}
                   className="relative cursor-pointer px-2 py-1 rounded hover:bg-white/10"
                   style={{ color: "var(--title-bar-text)" }}
-                  onClick={() => { setFileMenuOpen(false); setEditMenuOpen(false); setViewMenuOpen(false); setHelpMenuOpen((o) => !o); }}
+                  onClick={() => { closeAllMenus(); setHelpMenuOpen((o) => !o); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -960,6 +1331,16 @@ function App() {
                     </div>
                   )}
                 </div>
+              ) : m === "Terminal" ? (
+                <button
+                  key={m}
+                  type="button"
+                  className="px-2 py-1 rounded hover:bg-white/10"
+                  style={{ color: "var(--title-bar-text)" }}
+                  onClick={openTerminal}
+                >
+                  {m}
+                </button>
               ) : m === "Copilot" ? (
                 <button
                   key={m}
@@ -995,10 +1376,10 @@ function App() {
         </button>
         <div className="hidden w-8 shrink-0 lg:block lg:w-32" />
       </header>
-      {(fileMenuOpen || editMenuOpen || viewMenuOpen || helpMenuOpen) && (
+      {(fileMenuOpen || editMenuOpen || viewMenuOpen || goMenuOpen || runMenuOpen || helpMenuOpen) && (
         <div
           className="fixed inset-0 z-40"
-          onClick={() => { setFileMenuOpen(false); setEditMenuOpen(false); setViewMenuOpen(false); setHelpMenuOpen(false); }}
+          onClick={closeAllMenus}
           aria-hidden
         />
       )}
@@ -1436,22 +1817,34 @@ function App() {
             <IconSearch />
           </button>
           <button
+            onClick={() => setActiveSidebar("source-control")}
             className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90"
-            style={{ color: "var(--activity-bar-text)" }}
+            style={{
+              backgroundColor: activeSidebar === "source-control" ? "var(--activity-bar-active-bg)" : "transparent",
+              color: activeSidebar === "source-control" ? "var(--text-primary)" : "var(--activity-bar-text)",
+            }}
             title="Source Control"
           >
             <IconSourceControl />
           </button>
           <button
+            onClick={() => setActiveSidebar("extensions")}
             className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90"
-            style={{ color: "var(--activity-bar-text)" }}
+            style={{
+              backgroundColor: activeSidebar === "extensions" ? "var(--activity-bar-active-bg)" : "transparent",
+              color: activeSidebar === "extensions" ? "var(--text-primary)" : "var(--activity-bar-text)",
+            }}
             title="Extensions"
           >
             <IconExtensions />
           </button>
           <button
+            onClick={() => setActiveSidebar("portfolio")}
             className="mt-4 flex h-10 w-10 items-center justify-center rounded hover:opacity-90"
-            style={{ color: "var(--activity-bar-text)" }}
+            style={{
+              backgroundColor: activeSidebar === "portfolio" ? "var(--activity-bar-active-bg)" : "transparent",
+              color: activeSidebar === "portfolio" ? "var(--text-primary)" : "var(--activity-bar-text)",
+            }}
             title="Portfolio"
           >
             <IconPortfolio />
@@ -1468,10 +1861,20 @@ function App() {
             <IconAIAssistant />
           </button>
           <div className="mt-auto flex flex-col gap-1">
-            <button className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90" style={{ color: "var(--activity-bar-text)" }}>
+            <button
+              onClick={() => setThemePickerOpen((o) => !o)}
+              className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90"
+              style={{ color: "var(--activity-bar-text)" }}
+              title="Settings (Theme)"
+            >
               <IconSettings />
             </button>
-            <button className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90" style={{ color: "var(--activity-bar-text)" }}>
+            <button
+              onClick={() => openTab("about")}
+              className="flex h-10 w-10 items-center justify-center rounded hover:opacity-90"
+              style={{ color: "var(--activity-bar-text)" }}
+              title="Account (About Me)"
+            >
               <IconAccount />
             </button>
           </div>
@@ -1486,29 +1889,271 @@ function App() {
             className="flex h-10 items-center justify-between border-b px-3 uppercase tracking-wider text-[11px]"
             style={{ borderColor: "var(--sidebar-border)", color: "var(--sidebar-header-text)" }}
           >
-            Portfolio
+            {activeSidebar === "explorer" && "Explorer"}
+            {activeSidebar === "search" && "Search"}
+            {activeSidebar === "source-control" && "Source Control"}
+            {activeSidebar === "extensions" && "Extensions"}
+            {activeSidebar === "portfolio" && "Portfolio"}
           </div>
           <div className="flex-1 overflow-auto py-1">
-            {FILES.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => {
-                  if (f.id === "resume") {
-                    handleResumeDownload();
-                  } else {
-                    openTab(f.id);
-                  }
-                }}
-                className={`sidebar-file flex w-full items-center gap-2 px-3 py-1.5 text-left ${f.id === "resume" ? "opacity-90" : ""}`}
-                style={{
-                  backgroundColor: activeFile === f.id ? "var(--sidebar-selected-bg)" : "transparent",
-                  color: activeFile === f.id ? "var(--text-primary)" : undefined,
-                }}
-              >
-                <span className="text-[16px] font-medium text-amber-500/90">{f.icon === "tsx" ? "⚛" : f.icon === "md" ? "📄" : f.icon === "pdf" ? "📕" : "▤"}</span>
-                <span className="truncate text-[13px]">{f.label}</span>
-              </button>
-            ))}
+
+            {/* Explorer view */}
+            {activeSidebar === "explorer" && (
+              <>
+                {FILES.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      if (f.id === "resume") {
+                        handleResumeDownload();
+                      } else {
+                        openTab(f.id);
+                      }
+                    }}
+                    className={`sidebar-file flex w-full items-center gap-2 px-3 py-1.5 text-left ${f.id === "resume" ? "opacity-90" : ""}`}
+                    style={{
+                      backgroundColor: activeFile === f.id ? "var(--sidebar-selected-bg)" : "transparent",
+                      color: activeFile === f.id ? "var(--text-primary)" : undefined,
+                    }}
+                  >
+                    <span className="text-[16px] font-medium text-amber-500/90">{f.icon === "tsx" ? "⚛" : f.icon === "md" ? "📄" : f.icon === "pdf" ? "📕" : "▤"}</span>
+                    <span className="truncate text-[13px]">{f.label}</span>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* Search view */}
+            {activeSidebar === "search" && (
+              <div className="px-3 py-3 space-y-3">
+                <button
+                  type="button"
+                  onClick={openCommandPalette}
+                  className="flex w-full items-center gap-2 rounded border px-2.5 py-2 text-[12px]"
+                  style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)", color: "var(--text-muted)" }}
+                >
+                  <IconSearch />
+                  <span>Search files...</span>
+                </button>
+                <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                  Use Ctrl+P to quickly open any file or run a command.
+                </p>
+              </div>
+            )}
+
+            {/* Source Control view */}
+            {activeSidebar === "source-control" && (
+              <div className="px-3 py-3 space-y-4">
+                <div className="flex items-center gap-2 text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
+                  <LogoGitHub />
+                  <span>main</span>
+                  <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: "var(--sidebar-selected-bg)", color: "var(--link-color)" }}>
+                    synced
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                    Repositories
+                  </p>
+                  <a
+                    href={profile.links.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sidebar-file flex w-full items-center gap-2 rounded px-2 py-1.5 text-[12px] text-left"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <LogoGitHub className="shrink-0" />
+                    <span className="truncate">aryangupta005</span>
+                  </a>
+                </div>
+                <div className="my-2 border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Recent Commits
+                </p>
+                {projects.slice(0, 3).map((p) => (
+                  <a
+                    key={p.name}
+                    href={p.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sidebar-file flex flex-col gap-0.5 rounded px-2 py-1.5 text-left"
+                  >
+                    <span className="text-[12px] truncate" style={{ color: "var(--text-primary)" }}>{p.name}</span>
+                    <span className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{p.stack.split(", ").slice(0, 3).join(", ")}</span>
+                  </a>
+                ))}
+                <div className="my-2 border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <a
+                  href={profile.links.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded border px-2.5 py-2 text-[12px] font-medium transition-colors hover:opacity-90"
+                  style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)", color: "var(--link-color)" }}
+                >
+                  <LogoGitHub />
+                  View all on GitHub
+                </a>
+              </div>
+            )}
+
+            {/* Extensions view — tech stack */}
+            {activeSidebar === "extensions" && (
+              <div className="px-3 py-3 space-y-4">
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Languages
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {skills.languages.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded px-2 py-1 text-[11px] font-medium"
+                      style={{ backgroundColor: "var(--sidebar-selected-bg)", color: "var(--text-primary)" }}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+                <div className="border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Web & Frameworks
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {skills.web.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded px-2 py-1 text-[11px] font-medium"
+                      style={{ backgroundColor: "var(--sidebar-selected-bg)", color: "var(--link-color)" }}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+                <div className="border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Tools & Databases
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {skills.tools.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded px-2 py-1 text-[11px] font-medium"
+                      style={{ backgroundColor: "var(--sidebar-selected-bg)", color: "var(--text-secondary)" }}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+                <div className="border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Fundamentals
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {skills.fundamentals.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded px-2 py-1 text-[11px] font-medium"
+                      style={{ backgroundColor: "var(--sidebar-selected-bg)", color: "var(--text-muted)" }}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+                <div className="border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <button
+                  type="button"
+                  onClick={() => openTab("skills")}
+                  className="flex w-full items-center gap-2 rounded border px-2.5 py-2 text-[12px] font-medium transition-colors hover:opacity-90"
+                  style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)", color: "var(--link-color)" }}
+                >
+                  View full skills.json
+                </button>
+              </div>
+            )}
+
+            {/* Portfolio view — quick links */}
+            {activeSidebar === "portfolio" && (
+              <div className="px-3 py-3 space-y-4">
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Quick Navigation
+                </p>
+                {([
+                  { label: "Home", icon: "🏠", file: "home" as FileId },
+                  { label: "About Me", icon: "👤", file: "about" as FileId },
+                  { label: "Projects", icon: "📁", file: "projects" as FileId },
+                  { label: "Experience", icon: "💼", file: "experience" as FileId },
+                  { label: "Skills", icon: "⚡", file: "skills" as FileId },
+                  { label: "Contact", icon: "✉️", file: "contact" as FileId },
+                ]).map((item) => (
+                  <button
+                    key={item.file}
+                    type="button"
+                    onClick={() => openTab(item.file)}
+                    className="sidebar-file flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[13px]"
+                    style={{
+                      backgroundColor: activeFile === item.file ? "var(--sidebar-selected-bg)" : "transparent",
+                      color: activeFile === item.file ? "var(--text-primary)" : "var(--text-secondary)",
+                    }}
+                  >
+                    <span className="text-[15px]">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+                <div className="border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--sidebar-header-text)" }}>
+                  Social Links
+                </p>
+                <div className="space-y-1">
+                  <a
+                    href={profile.links.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sidebar-file flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <LogoGitHub className="shrink-0" />
+                    GitHub
+                  </a>
+                  <a
+                    href={profile.links.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sidebar-file flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <LogoLinkedIn className="text-[#0a66c2] shrink-0" />
+                    LinkedIn
+                  </a>
+                  <a
+                    href={profile.links.leetcode}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sidebar-file flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <LogoLeetCode className="text-[#ffa116] shrink-0" />
+                    LeetCode
+                  </a>
+                  <a
+                    href={profile.links.email}
+                    className="sidebar-file flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px]"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <span style={{ color: "var(--link-color)" }}><LogoEmail /></span>
+                    Email
+                  </a>
+                </div>
+                <div className="border-t" style={{ borderColor: "var(--sidebar-border)" }} />
+                <button
+                  type="button"
+                  onClick={handleResumeDownload}
+                  className="flex w-full items-center gap-2 rounded border px-2.5 py-2 text-[12px] font-medium transition-colors hover:opacity-90"
+                  style={{ borderColor: "var(--card-border)", backgroundColor: "var(--card-bg)", color: "var(--link-color)" }}
+                >
+                  📕 Download Resume
+                </button>
+              </div>
+            )}
+
           </div>
         </aside>
 
@@ -2005,6 +2650,149 @@ function App() {
               </div>
             )}
           </div>
+
+          {/* Terminal Panel */}
+          {terminalOpen && (
+            <div
+              className="flex shrink-0 flex-col border-t"
+              style={{
+                borderColor: "var(--sidebar-border)",
+                backgroundColor: "var(--terminal-bg, #1e1e1e)",
+                height: "clamp(160px, 30vh, 320px)",
+              }}
+            >
+              <div
+                className="flex shrink-0 items-center justify-between border-b"
+                style={{ borderColor: "var(--sidebar-border)", backgroundColor: "var(--tab-bar-bg)" }}
+              >
+                <div className="flex items-center">
+                  {(["terminal", "problems", "output"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setTerminalTab(tab)}
+                      className="relative px-3 py-1.5 text-[12px] font-medium uppercase tracking-wider transition-colors"
+                      style={{
+                        color: terminalTab === tab ? "var(--text-primary)" : "var(--text-muted)",
+                        borderBottomWidth: terminalTab === tab ? 2 : 0,
+                        borderBottomColor: terminalTab === tab ? "var(--tab-active-border)" : "transparent",
+                      }}
+                    >
+                      {tab}
+                      {tab === "problems" && (
+                        <span
+                          className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]"
+                          style={{ backgroundColor: "var(--sidebar-selected-bg)", color: "var(--text-muted)" }}
+                        >
+                          0
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTerminalHistory([{ type: "output", text: "Welcome! Type 'help' to see available commands." }]);
+                    }}
+                    className="rounded p-1 hover:bg-white/10"
+                    style={{ color: "var(--text-muted)" }}
+                    aria-label="Clear terminal"
+                    title="Clear"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 6h18M8 6V4h8v2M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTerminalOpen(false)}
+                    className="rounded p-1 hover:bg-white/10"
+                    style={{ color: "var(--text-muted)" }}
+                    aria-label="Close terminal"
+                    title="Close"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {terminalTab === "terminal" ? (
+                <div
+                  ref={terminalScrollRef}
+                  className="terminal-scroll flex-1 overflow-auto px-3 py-2 font-mono text-[12px] leading-relaxed sm:text-[13px]"
+                  style={{ color: "var(--text-secondary)" }}
+                  onClick={() => terminalInputRef.current?.focus()}
+                >
+                  {terminalHistory.map((entry, i) => (
+                    <div key={i} className="whitespace-pre-wrap">
+                      {entry.type === "input" ? (
+                        <div className="flex gap-2">
+                          <span style={{ color: "var(--link-color)" }}>visitor@portfolio</span>
+                          <span style={{ color: "var(--text-muted)" }}>$</span>
+                          <span style={{ color: "var(--text-primary)" }}>{entry.text}</span>
+                        </div>
+                      ) : (
+                        <div style={{ color: "var(--text-secondary)" }}>{entry.text}</div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="mt-1 flex items-center gap-2">
+                    <span style={{ color: "var(--link-color)" }}>visitor@portfolio</span>
+                    <span style={{ color: "var(--text-muted)" }}>$</span>
+                    <input
+                      ref={terminalInputRef}
+                      type="text"
+                      value={terminalInput}
+                      onChange={(e) => setTerminalInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          processTerminalCommand(terminalInput);
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          if (terminalCmdHistory.length > 0) {
+                            const next = Math.min(terminalCmdIndex + 1, terminalCmdHistory.length - 1);
+                            setTerminalCmdIndex(next);
+                            setTerminalInput(terminalCmdHistory[next]);
+                          }
+                        } else if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          if (terminalCmdIndex > 0) {
+                            const next = terminalCmdIndex - 1;
+                            setTerminalCmdIndex(next);
+                            setTerminalInput(terminalCmdHistory[next]);
+                          } else {
+                            setTerminalCmdIndex(-1);
+                            setTerminalInput("");
+                          }
+                        } else if (e.key === "l" && e.ctrlKey) {
+                          e.preventDefault();
+                          setTerminalHistory([]);
+                        }
+                      }}
+                      className="min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none caret-current sm:text-[13px]"
+                      style={{ color: "var(--text-primary)" }}
+                      spellCheck={false}
+                      autoComplete="off"
+                      autoFocus
+                    />
+                    <span className="terminal-cursor" aria-hidden />
+                  </div>
+                </div>
+              ) : terminalTab === "problems" ? (
+                <div className="flex flex-1 items-center justify-center text-[13px]" style={{ color: "var(--text-muted)" }}>
+                  No problems detected — portfolio is running smoothly.
+                </div>
+              ) : (
+                <div className="flex flex-1 items-center justify-center text-[13px]" style={{ color: "var(--text-muted)" }}>
+                  Build output: ✓ compiled successfully.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
